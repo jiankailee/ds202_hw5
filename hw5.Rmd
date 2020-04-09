@@ -1,0 +1,76 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Liquor Sales in Iowa
+
+This dataset https://data.iowa.gov/Sales-Distribution/2019-Iowa-Liquor-Sales/38x4-vs5h contains the spirits purchase information of Iowa Class “E” liquor licensees by product and date of purchase for 2019. The dataset can be used to analyze total spirits sales in Iowa of individual products at the store level.
+
+**Submission instructions**: Create a folder named `ds202_hw5`, and name the RMarkDown file including your solutions `hw5.Rmd` under this folder. For the submission, create a GitHub repository named `ds202_hw5` under your GitHub account, and push both `hw5.Rmd` and the knitted `hw5.html` before the deadline. I will assume you use the same GitHub username as for your HW4 submission. The latest version of your homework appearing on GitHub before the deadline is graded. *It is crucial to follow the exact folder structure and file names*, so that your homework can be reproduced and graded by an automated script. This homework is **due on April 10** by 11:59 pm.
+
+1. The complete dataset is too large. Download and import the alcohol sales data for Ames only: 
+
+  a. Go to https://data.iowa.gov/Sales-Distribution/2019-Iowa-Liquor-Sales/38x4-vs5h
+  b. Click Filter -- Filter -- Go advanced now
+  c. Add a New Filter Condition: City is Ames.
+  d. Export -- CSV -- Download
+  e. Use `readr::read_csv` to import.
+```{r}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+options(digits=9)
+data<-readr::read_csv("2019_Iowa_Liquor_Sales.csv")
+```
+  
+2. Data cleaning: 
+  a. extract geographic latitude and longitude from the variable `Store Location`
+  b. make sure the variables are in the correct type, by converting incorrect variable types.
+  c. extract year, month and day from the variable `Date` as separate columns.
+```{r}
+#clean <-data%>%separate('Store Location',c('a','b'))%>%drop_na()
+#clean <-data%>%mutate('Store Location'=gsub("POINT ","",`Store Location`))%>%drop_na()
+clean <-data%>%mutate('Store Location'=gsub("POINT ","",`Store Location`))%>%mutate('Store Location'=gsub("[()]","",`Store Location`))%>%separate('Store Location',into=c("Latitude","Longitude"),sep=" ")%>%drop_na()
+
+clean$Latitude<-as.numeric(clean$Latitude)
+clean$Longitude<-as.numeric(clean$Longitude)
+clean$`Vendor Number`<-as.numeric(clean$`Vendor Number`)
+clean$Date<-mdy(clean$Date)
+clean$Year<-year(clean$Date)
+clean$Month <- month(clean$Date)
+clean$Day<-day(clean$Date)
+str(clean)
+```
+3. First overview:
+  a. Plot a scatterplot of lat and long of store locations.
+```{r}
+temp<-clean%>%distinct(`Store Name`,`Latitude`,`Longitude`)
+temp%>%ggplot(aes(x=Latitude,y=Longitude,color=`Store Name`))+geom_point()+xlab("Latitude")+ylab("Longitude")+ggtitle("Longitude and Latitude of store location")
+```
+  b. Provide a visual breakdown of the liquor category (by `Category Name`). Include volume sold in the breakdown.
+```{r}
+clean%>%ggplot(aes(x=`Category Name`,count=`Volume Sold (Liters)`))+geom_histogram(stat = "count")+coord_flip()+theme(axis.text.y = element_text(size = 6))+ylab("Volume Sold (Liters)")+ggtitle("Volume Sold in Category Name")
+
+```
+4. Find the daily sales liquor sales in Ames in 2019. Summarize the number of sales, volume of liquor sold, and amount of money spent.
+```{r}
+summary(clean$`Bottles Sold`)
+summary(clean$`Volume Sold (Liters)`)
+summary(clean$`Sale (Dollars)`)
+temp<-clean%>%filter(Year==2019)%>%group_by(Date)%>%summarize(bottles_sold=sum(`Bottles Sold`),volume_liters=sum(`Volume Sold (Liters)`),Sales=sum(`Sale (Dollars)`))
+temp%>%ggplot(aes(x=Date,y=Sales))+geom_line()+geom_smooth(span=1/2)+ylab("Sales (Dollars)")
+```
+The mean of the number of sales is 6 bottles per day.
+The mean of the volume sold in litter is 4.8L
+The mean of the 
+5. Plot volume sold by day (use a scatterplot of volume by day and facet by month). Discover trends with the help of `geom_smooth`. Describe any patterns.
+```{r}
+temp<-clean%>%filter(Year==2019)%>%group_by(Month,Day)%>%summarize(bottles_sold=sum(`Bottles Sold`),volume_liters=sum(`Volume Sold (Liters)`),Sales=sum(`Sale (Dollars)`))
+temp%>%ggplot(aes(x=Day,y=volume_liters))+geom_smooth()+facet_wrap(~Month)+ylim(0,15000)+ylab("Volume Sold (Liters)")
+```
+The pattern is increasing when at the end of july and middle of august, the begining of november. There is significant decrease toward the end of april. 
+6. Find the dates for ISU football home games in Fall 2019. Can you see a pattern? 
+The first home football games was on the end of august 8/31, 9/14, 9/21, 11/16. I can the volume increase and at the peak of the month. Therefore, there must be football in town. In October, the volume of litter sold is not significant changes. 
+
+
+Note: your submission is supposed to be fully reproducible, i.e. the TA and I will 'knit' your submission in RStudio. 
